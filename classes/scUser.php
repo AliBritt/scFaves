@@ -1,5 +1,5 @@
 <?php
-//echo "scUser.php accessed. ";
+
 //access soundcloud api php wrapper
 require('includes/Soundcloud.php');
 
@@ -9,12 +9,21 @@ require 'credScUser.php';
 
 class scUser{
 	//define variables
-	//do I need to store services soundcloud in here?
 	private $scWrap				= "";
 	
 	private $scAuthUrl			= "";
 	private $scAccessToken		= "";
 	private $messages			= "";
+	private $scUserName			= "";
+	
+	private $seachTerm			= "";
+	private $searchResults		= array();
+	private $trackResults		= "";
+	private $embed_info			= "";
+	private $resultsHtml		= "";
+	
+	private $pinUrl				= "";
+	private $trackUrlsAry		= array();
 	
 	
 	// call new services soundcloud
@@ -32,7 +41,7 @@ class scUser{
 	//loginToSc()
 	// get redirect url from sc and go there	
 	public function loginToSc(){
-		//echo "called funtion.";
+		
 		try{
 			$this->scAuthUrl = $this->scWrap->getAuthorizeUrl();
 		
@@ -40,38 +49,45 @@ class scUser{
 			
 		}catch(Services_Soundcloud_Invalid_Http_Response_Code_Exception $e) {
 			exit($e->getMessage());
-			//$this->messages = $e->getMessages();
-			//echo "services. ";
-			//print_r($this->messages);
 			
-			}
+		}
+		
+		//get user deets
+		
+		try{
+			$userDetails = json_decode($this->scWrap->get('me'), true);
+			$this->scUserName = $userDetails['username'];
+			$_SESSION['scUserName'] = $this->scUserName;
+			
+		}catch(Services_Soundcloud_Invalid_Http_Response_Code_Exception $e) {
+			exit($e->getMessage());
+		}
 	}
 	
+	//userDeets()
+		//me - for sc username
 	
 	public function accessToken(){
-		echo "accessToken function accessed";
-	//accessToken allows us to ?? why do this?fuckitdoitanywayy
+		
 		if(!isset($_SESSION['scUserToken'])){
 			try{
 				$this->scAccessToken = $this->scWrap->accessToken($_GET['code']);
-					print_r($this->scAccessToken);
+					
 				//set SESSION to access token(from accesstoken array)
 				$_SESSION['scUserToken'] = $this->scAccessToken['access_token'];
-				//print_r($_SESSION['scUserToken']);
 				
-				echo " 1 ";
 				
 			} catch (Services_Soundcloud_Invalid_Http_Response_Code_Exception $e) {
 				exit($e->getMessage());
 				
 			}
 		}else{
+			
 			//set our classes accesstoken property to the session data
 				
 			try{
-				
 				$this->scWrap->setAccessToken($_SESSION['scUserToken']);
-				echo " 2 ";
+				
 			} catch (Services_Soundcloud_Invalid_Http_Response_Code_Exception $e) {
 				exit($e->getMessage());
 			}
@@ -79,54 +95,46 @@ class scUser{
 	
 	}
 	
-	//userDeets()
-		//me - for sc username
+	
 	//scUserRecall()
 		//connect to db and return urls of embedded pinned tracks
-		//or display 'no tracks pinned please search
+		//or display 'no tracks pinned please search'
 		
 	//scUserSearch()
+	//search by...?
 	public function scSearch(){
-		echo "scSearch function accessed";
 		
-		$username = 'ali britt';
+		$this->searchTerm = $_POST['searchTerm'];
 
-		$tracksSearchQ = json_decode($this->scWrap->get('tracks', array('q' => $username)), true);
-		//echo "<pre>";
-		//print_r($tracksSearchQ);
+		$tracksSearchQ = json_decode($this->scWrap->get('tracks', array('q' => $this->searchTerm)), true);
+
 		//print_r($tracksSearchQ[0]['permalink_url']);
-		
+
 		//select trackurls(permalink url) from returned array
 		//cycle through top level array
 		foreach($tracksSearchQ as $trackInfo){
 			//cycle through track info. array 
 			foreach($trackInfo as $key=>$value){
-			 // echo "$key . 'is' . $value . '<br>'";
-			 
+
 				//and identify urls
 				if ($key == 'permalink_url'){
 					//not sure what this does
 					$this->scWrap->setCurlOptions(array(CURLOPT_FOLLOWLOCATION => 1));
 					
-					//echo "$key . 'is' . $value . '<br>'";
 					try{
 						
 						//set var to array urls
 						$track_url = $value;
-						//print_r($track_url) ;
-						echo "<br>";
-						//$embed_info = json_decode($scUser->get('oembed', array('url' => $track_url)));
-						
+						//create and array of all track urls for use later?for db?
+						//array_push($this->trackUrlsAry, $track_url);
+					
 						//embed tracks using url and oembed code
 						$embed_info = json_decode($this->scWrap->get('oembed', 
-							array('url' => $track_url , 'maxheight' => '150', 'maxwidth' => '400')));
-						 
-					
-						// render the html for the player widget
-						print $embed_info->html;
-						echo "<br>";
-			
-					//print_r($embed_info);
+							array('url' => $track_url , 'maxheight' => '160', 'maxwidth' => '814')));
+							
+						// render the html for the player widget. add this to $searchResults array
+						array_push($this->searchResults, $embed_info->html);
+						
 					
 					}catch (Services_Soundcloud_Invalid_Http_Response_Code_Exception $e) {
 					    exit($e->getMessage());
@@ -138,19 +146,43 @@ class scUser{
 					
 				}
 		
-			
+			// end of for each loop
 			}
-		 
+		 // end of top level for each
 		}
 		
+			//create html for all embed html from searchResults array
+	 	 foreach ($this->searchResults as $this->trackResults){
+					$this->resultsHtml .=
+						'<div>
+							<form class="form-pinUrl" action="scUserSearch.php" method="POST" id="pinUrlForm">'
+								. $this->trackResults
+		          				. '<p><a class="btn btn-default" href="#" role="button">Pin &raquo;</a></p>
+		          			</form>
+        				</div>';
+				}
+		// store all the html created by multiple embed htmls and above html in session
+		//view can access this. may be a better way to do this
+		$_SESSION['searchResults'] = $this->resultsHtml;
+		
+	
 	}
-		// Search for tracks. Embed results
+	
 		
 	//scUserPin()
 		// insert new track into db
+		//get iframe scr into post?or maybe jquery
+		//jquery onclick triggers function maybe?
+	/*private function scUserPin(){
+		//if post conditional - conflict with search post?
+		//$this->pinUrl = $_POST['pinUrl'];
+		//print $this->pinUrl;
+		print_r($this->trackUrlsAry);
+	}*/
 		
 	//scUserPinDel()
 		// delete track in db
+		//similar method to above
 	
 };
 
