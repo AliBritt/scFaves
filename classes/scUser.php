@@ -25,6 +25,8 @@ class scUser{
 	private $pinUrl				= "";
 	private $trackUrlsAry		= array();
 	
+	//private $messages			= "";
+		
 	
 	// call new services soundcloud
 	public function __construct(){
@@ -52,7 +54,43 @@ class scUser{
 			
 		}
 		
+		
+	}
+	
+	
+	public function getAccessToken(){
+			
+		  try{
+				$this->scAccessToken = $this->scWrap->accessToken($_GET['code']);
+					
+				//set SESSION to access token(from accesstoken array)
+				$_SESSION['scUserToken'] = $this->scAccessToken['access_token'];
+				
+				
+			} catch (Services_Soundcloud_Invalid_Http_Response_Code_Exception $e) {
+				exit($e->getMessage());
+			}
+		
+	}
+				
+	
+	public function scSetAccessToken(){
+		//set our classes accesstoken property to the session data
+		//wont have to access session every time to use api
+				
+			try{
+				$this->scWrap->setAccessToken($_SESSION['scUserToken']);
+				
+			} catch (Services_Soundcloud_Invalid_Http_Response_Code_Exception $e) {
+				exit($e->getMessage());
+			}
+	}
+	
+	
+	//userDeets()
+		//me - for sc username
 		//get user deets
+	public function userDetails(){
 		
 		try{
 			$userDetails = json_decode($this->scWrap->get('me'), true);
@@ -64,41 +102,6 @@ class scUser{
 		}
 	}
 	
-	//userDeets()
-		//me - for sc username
-	
-	public function accessToken(){
-		
-		if(!isset($_SESSION['scUserToken'])){
-			try{
-				$this->scAccessToken = $this->scWrap->accessToken($_GET['code']);
-					
-				//set SESSION to access token(from accesstoken array)
-				$_SESSION['scUserToken'] = $this->scAccessToken['access_token'];
-				
-				
-			} catch (Services_Soundcloud_Invalid_Http_Response_Code_Exception $e) {
-				exit($e->getMessage());
-				
-			}
-		}else{
-			
-			//set our classes accesstoken property to the session data
-				
-			try{
-				$this->scWrap->setAccessToken($_SESSION['scUserToken']);
-				
-			} catch (Services_Soundcloud_Invalid_Http_Response_Code_Exception $e) {
-				exit($e->getMessage());
-			}
-		}
-	
-	}
-	
-	
-	//scUserRecall()
-		//connect to db and return urls of embedded pinned tracks
-		//or display 'no tracks pinned please search'
 		
 	//scUserSearch()
 	//search by...?
@@ -168,6 +171,10 @@ class scUser{
 	
 	}
 	
+	//scUserRecall()
+		//connect to db and return urls of embedded pinned tracks
+		//or display 'no tracks pinned please search'
+		
 		
 	//scUserPin()
 		// insert new track into db
@@ -179,11 +186,35 @@ class scUser{
 		//print $this->pinUrl;
 		print_r($this->trackUrlsAry);
 	}*/
-		
+	
+	
 	//scUserPinDel()
 		// delete track in db
 		//similar method to above
+
+	public function scLogout(){
+			//access the session
+			session_start();
+			//if no session is present redirect the user
+			if(!isset($_SESSION['scUserToken'])){
+			
+				header('location:http://127.0.0.1/scFaves/LoginToSoundcloud.php');
+			}
+			else{
+				//cancel session
+				$_SESSION = array(); //setting SESSION to empty array resets SESSION
+				session_destroy(); // removes data from server.does not unset global variables
+				setcookie('PHPSESSID', '', time()-3600,'/','', 0, 0);//destroys cookie.
+				//PHPSESSID is the session ID parameter passed in a cookie. not sure about the rest of parameters except time???
+				$this->messages .= "You are now logged out";
+				$this->messages .= "<a href='LoginToSoundcloud.php'> Log In </a>";
+			}			
+			
+		echo "<label class='form-signin'>$this->messages</label>";
 	
+	}
+
+ 
 };
 
 
